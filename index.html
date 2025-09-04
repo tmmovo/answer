@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 阅读器</title>
+    
+    <!-- Marked.js for markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.2/marked.min.js"></script>
+    
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    
+    <!-- Highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            width: 300px;
+            background-color: #2d2d2d;
+            border-right: 2px solid #1e3a8a;
+            padding: 20px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .sidebar h3 {
+            color: #60a5fa;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            border-bottom: 2px solid #1e3a8a;
+            padding-bottom: 8px;
+        }
+
+        .toc {
+            list-style: none;
+        }
+
+        .toc li {
+            margin: 8px 0;
+        }
+
+        .toc a {
+            color: #e5e7eb;
+            text-decoration: none;
+            display: block;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .toc a:hover {
+            background-color: #374151;
+            border-left-color: #60a5fa;
+            color: #ffffff;
+        }
+
+        .toc .level-1 {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .toc .level-2 {
+            margin-left: 15px;
+            font-size: 0.95em;
+        }
+
+        .toc .level-3 {
+            margin-left: 30px;
+            font-size: 0.9em;
+            color: #9ca3af;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            flex: 1;
+            margin-left: 300px;
+            padding: 40px;
+            max-width: calc(100vw - 300px);
+        }
+
+        /* Markdown 内容样式 */
+        .markdown-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            color: #60a5fa;
+            margin: 30px 0 15px 0;
+            font-weight: 600;
+        }
+
+        .markdown-content h1 {
+            font-size: 2.5em;
+            border-bottom: 3px solid #1e3a8a;
+            padding-bottom: 10px;
+        }
+
+        .markdown-content h2 {
+            font-size: 2em;
+            border-bottom: 2px solid #1e3a8a;
+            padding-bottom: 8px;
+        }
+
+        .markdown-content h3 {
+            font-size: 1.5em;
+        }
+
+        .markdown-content p {
+            margin: 15px 0;
+            text-align: justify;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+
+        .markdown-content li {
+            margin: 8px 0;
+        }
+
+        .markdown-content strong {
+            color: #fbbf24;
+            font-weight: 600;
+        }
+
+        .markdown-content em {
+            color: #a78bfa;
+            font-style: italic;
+        }
+
+        /* 表格样式 */
+        .markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #374151;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .markdown-content th,
+        .markdown-content td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #4b5563;
+        }
+
+        .markdown-content th {
+            background-color: #1e3a8a;
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .markdown-content tr:hover {
+            background-color: #4b5563;
+        }
+
+        /* 引用块样式 */
+        .markdown-content blockquote {
+            border-left: 4px solid #1e3a8a;
+            background-color: #374151;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .markdown-content blockquote p {
+            margin: 0;
+            color: #d1d5db;
+        }
+
+        /* 代码样式 */
+        .markdown-content code {
+            background-color: #374151;
+            color: #fbbf24;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .markdown-content pre {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+            color: #e5e7eb;
+        }
+
+        /* 水平线样式 */
+        .markdown-content hr {
+            border: none;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #1e3a8a, transparent);
+            margin: 30px 0;
+        }
+
+        /* KaTeX 数学公式样式 */
+        .katex {
+            color: #60a5fa !important;
+        }
+
+        .katex-display {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 250px;
+            }
+            
+            .main-content {
+                margin-left: 250px;
+                padding: 20px;
+                max-width: calc(100vw - 250px);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                max-width: 100vw;
+            }
+            
+            .menu-toggle {
+                display: block;
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                z-index: 1001;
+                background-color: #1e3a8a;
+                color: white;
+                border: none;
+                padding: 10px;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+        }
+
+        .menu-toggle {
+            display: none;
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 1.2em;
+            color: #60a5fa;
+        }
+
+        .error {
+            color: #ef4444;
+            background-color: #7f1d1d;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+    
+    <div class="container">
+        <div class="sidebar" id="sidebar">
+            <h3>📚 目录</h3>
+            <ul class="toc" id="toc">
+                <!-- 目录将通过JavaScript生成 -->
+            </ul>
+        </div>
+        
+        <div class="main-content">
+            <div class="markdown-content" id="content">
+                <div class="loading">正在加载内容...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 配置 marked.js
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            highlight: function(code, lang) {
+                // 检查highlight.js是否可用
+                if (typeof hljs === 'undefined') {
+                    return code; // 如果highlight.js不可用，返回原始代码
+                }
+                
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (err) {
+                        return code;
+                    }
+                }
+                try {
+                    return hljs.highlightAuto(code).value;
+                } catch (err) {
+                    return code;
+                }
+            }
+        });
+
+        // 生成目录
+        function generateTOC(content) {
+            const toc = document.getElementById('toc');
+            toc.innerHTML = '';
+            
+            const headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
+            
+            headings.forEach((heading, index) => {
+                const level = parseInt(heading.tagName.charAt(1));
+                const id = `heading-${index}`;
+                heading.id = id;
+                
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = `#${id}`;
+                a.textContent = heading.textContent;
+                a.className = `level-${level}`;
+                
+                // 平滑滚动
+                a.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    heading.scrollIntoView({ 
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                });
+                
+                li.appendChild(a);
+                toc.appendChild(li);
+            });
+        }
+
+        // 渲染 LaTeX 数学公式
+        function renderMath(element) {
+            renderMathInElement(element, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\[', right: '\\]', display: true},
+                    {left: '\\(', right: '\\)', display: false}
+                ],
+                throwOnError: false
+            });
+        }
+
+        // 加载并渲染 markdown 内容
+        function loadMarkdownContent() {
+            // 创建script标签来加载JavaScript文件
+            const script = document.createElement('script');
+            script.src = 'source/data/8dtctc.js';
+            script.onload = function() {
+                try {
+                    // 检查是否成功加载了markdownContent变量
+                    if (typeof dltctc8dRawData === 'undefined') {
+                        throw new Error('未找到 markdownContent 变量');
+                    }
+
+                    // 渲染 markdown
+                    const htmlContent = marked.parse(dltctc8dRawData);
+                    const contentDiv = document.getElementById('content');
+                    contentDiv.innerHTML = htmlContent;
+
+                    // 渲染数学公式
+                    renderMath(contentDiv);
+
+                    // 生成目录
+                    generateTOC(contentDiv);
+
+                    // 高亮代码（如果highlight.js可用）
+                    if (typeof hljs !== 'undefined') {
+                        hljs.highlightAll();
+                    }
+
+                } catch (error) {
+                    console.error('渲染内容时出错:', error);
+                    document.getElementById('content').innerHTML = `
+                        <div class="error">
+                            <h3>❌ 渲染失败</h3>
+                            <p>无法渲染markdown内容。</p>
+                            <p>错误信息: ${error.message}</p>
+                        </div>
+                    `;
+                }
+            };
+            
+            script.onerror = function() {
+                console.error('加载JavaScript文件失败');
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        <h3>❌ 加载失败</h3>
+                        <p>无法加载 source/data/8dtctc.js 文件。</p>
+                        <p>请确保文件存在且路径正确。</p>
+                        <p>当前尝试加载的路径: <code>source/data/8dtctc.js</code></p>
+                    </div>
+                `;
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        // 切换侧边栏显示/隐藏（移动端）
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        // 检查必要的库是否加载
+        function checkLibraries() {
+            const status = {
+                marked: typeof marked !== 'undefined',
+                katex: typeof renderMathInElement !== 'undefined',
+                hljs: typeof hljs !== 'undefined'
+            };
+            
+            console.log('库加载状态:', status);
+            
+            if (!status.marked) {
+                console.error('Marked.js 未正确加载');
+            }
+            if (!status.katex) {
+                console.warn('KaTeX 未正确加载，数学公式可能无法显示');
+            }
+            if (!status.hljs) {
+                console.warn('Highlight.js 未正确加载，代码高亮可能无法显示');
+            }
+            
+            return status;
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 延迟一点时间确保所有库都加载完成
+            setTimeout(function() {
+                checkLibraries();
+                loadMarkdownContent();
+            }, 100);
+        });
+
+        // 处理窗口大小变化
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 600) {
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        });
+    </script>
+</body>
+</html>
